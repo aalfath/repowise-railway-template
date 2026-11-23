@@ -111,7 +111,7 @@ def register(path):
     repos = api("GET", "/api/repos")
     for repo in repos:
         if Path(repo["local_path"]).resolve() == path.resolve():
-            if indexed(repo["id"]):
+            if indexed(repo["id"]) or os.environ.get("REPOWISE_SMALL") == "1":
                 return repo, None
             # A first index that was interrupted (restart, out of memory):
             # retry it twice at most, so a repo too big for this service's
@@ -126,10 +126,16 @@ def register(path):
             job = api("POST", f"/api/repos/{repo['id']}/index", timeout=120)
             return repo, job.get("job_id")
     url = git("remote", "get-url", "origin", cwd=path).stdout.strip()
-    attempts_file(path).write_text("1")
+    small = os.environ.get("REPOWISE_SMALL") == "1"
+    if not small:
+        attempts_file(path).write_text("1")
     created = api("POST", "/api/repos",
-                  {"name": path.name, "local_path": str(path), "url": url, "index": True},
+                  {"name": path.name, "local_path": str(path), "url": url, "index": not small},
                   timeout=120)
+    if small:
+        log(f"{path.name}: registered but not indexed, because this service has under 900 MB "
+            "of memory and indexing a medium repository needs about 1 GB. Open it in the "
+            "dashboard and press Index (small repositories fit), or give the service 1 GB.")
     return created, created.get("initial_job_id")
 
 
