@@ -5,7 +5,7 @@
 FROM node:22.23.5-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS node
 FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0 AS caddy
 
-FROM python:3.13.18-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+FROM python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
 
 ARG REPOWISE_VERSION=0.62.0
 ARG REPOWISE_WEB_SHA256=3d45499d8a8069973775d4c779ffe8e7f062e8d2579acf037a0fafac90224af8
@@ -19,7 +19,7 @@ COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
 
 # Python dependencies exactly as upstream's uv.lock at v0.62.0, every file hash-checked.
 COPY requirements.lock repowise.lock /tmp/
-RUN pip install --no-cache-dir --no-deps --require-hashes -r /tmp/requirements.lock -r /tmp/repowise.lock \
+RUN pip install --no-cache-dir --no-deps --only-binary :all: --require-hashes -r /tmp/requirements.lock -r /tmp/repowise.lock \
  && python -c "import repowise.server, sys; print('repowise', __import__('importlib.metadata').metadata.version('repowise'))"
 
 # Prebuilt Next.js web UI from the GitHub release (the bundle `repowise serve` downloads).
