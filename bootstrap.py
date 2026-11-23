@@ -98,12 +98,35 @@ def wait_job(job_id):
         time.sleep(5)
 
 
+def indexed(repo_id):
+    jobs = api("GET", f"/api/jobs?repo_id={repo_id}&limit=50") or []
+    return any(j.get("status") == "completed" for j in jobs)
+
+
+def attempts_file(path):
+    return Path(os.environ["HOME"]) / f".index-attempts-{path.name}"
+
+
 def register(path):
     repos = api("GET", "/api/repos")
     for repo in repos:
         if Path(repo["local_path"]).resolve() == path.resolve():
-            return repo, None
+            if indexed(repo["id"]):
+                return repo, None
+            # A first index that was interrupted (restart, out of memory):
+            # retry it twice at most, so a repo too big for this service's
+            # memory cannot put the service in a restart loop.
+            f = attempts_file(path)
+            n = int(f.read_text() or 0) if f.exists() else 0
+            if n >= 2:
+                log(f"{path.name}: first index failed twice; not retrying. Give the service "
+                    "more memory, then start it from the dashboard (Index).")
+                return repo, None
+            f.write_text(str(n + 1))
+            job = api("POST", f"/api/repos/{repo['id']}/index", timeout=120)
+            return repo, job.get("job_id")
     url = git("remote", "get-url", "origin", cwd=path).stdout.strip()
+    attempts_file(path).write_text("1")
     created = api("POST", "/api/repos",
                   {"name": path.name, "local_path": str(path), "url": url, "index": True},
                   timeout=120)
