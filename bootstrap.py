@@ -136,6 +136,10 @@ def main():
         log("no repository to serve over MCP yet. Set REPOWISE_REPOS and redeploy.")
         while True:
             time.sleep(3600)
+    if os.environ.get("REPOWISE_SMALL") == "1":
+        log("MCP server is off: this service has under 900 MB of memory (needs about 1 GB).")
+        while True:
+            time.sleep(3600)
     log(f"MCP server for {first.name} at /mcp")
     os.chdir(first)
     os.execvp("repowise", ["repowise", "mcp", str(first), "--transport", "streamable-http",

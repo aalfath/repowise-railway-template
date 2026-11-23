@@ -22,6 +22,16 @@ export REPOWISE_WORKSPACE_CEILING="$DATA"
 limit=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
 case "$limit" in max|"") mem_mb=4096 ;; *) mem_mb=$((limit / 1048576)) ;; esac
 if [ "$mem_mb" -lt 1500 ]; then cpus=1; elif [ "$mem_mb" -lt 3000 ]; then cpus=2; else cpus=4; fi
+# Memory guard: the API, web UI and MCP server together need about 1 GB.
+# Below ~900 MB (Railway's Free plan gives 0.5 GB) the remote MCP server is
+# left off and the web UI and proxy run lean, so the dashboard still works.
+if [ "$mem_mb" -lt "${REPOWISE_MCP_MIN_MB:-900}" ]; then
+  small=1; : "${NODE_HEAP_MB:=96}"
+  echo "repowise-start: only ${mem_mb} MB of memory: the remote MCP server (/mcp) is OFF. Give the service 1 GB (Hobby plan or higher) to turn it on." >&2
+else
+  small=0; : "${NODE_HEAP_MB:=192}"
+fi
+export GOMAXPROCS="${GOMAXPROCS:-$cpus}" GOMEMLIMIT="${GOMEMLIMIT:-48MiB}"
 export PYTHON_CPU_COUNT="${PYTHON_CPU_COUNT:-$cpus}"
 export REPOWISE_PARSE_WORKERS="${REPOWISE_PARSE_WORKERS:-$cpus}"
 export REPOWISE_GIT_WORKERS="${REPOWISE_GIT_WORKERS:-$cpus}"
@@ -44,7 +54,7 @@ REPOWISE_HOST=127.0.0.1 python -m uvicorn repowise.server.app:create_app --facto
 pids="$pids $!"
 
 (cd /opt/repowise-web && REPOWISE_API_URL=http://127.0.0.1:7337 HOSTNAME=127.0.0.1 PORT=3000 \
-  NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB:-160}" exec node server.js) &
+  NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB} --max-semi-space-size=2" exec node server.js) &
 pids="$pids $!"
 
 caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
@@ -53,7 +63,7 @@ pids="$pids $!"
 # Clones the repos in REPOWISE_REPOS, registers and indexes them, then serves
 # MCP for the first one. It never exits on a bad repo; it exits non-zero only
 # if the MCP server itself dies.
-python /usr/local/bin/repowise-bootstrap &
+REPOWISE_SMALL="$small" python /usr/local/bin/repowise-bootstrap &
 pids="$pids $!"
 
 trap 'kill $pids 2>/dev/null; exit 1' TERM INT
