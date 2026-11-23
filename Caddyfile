@@ -1,0 +1,48 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:{$PORT} {
+	log {
+		output stderr
+		level ERROR
+	}
+
+	# Health check for Railway: the API's own liveness + database check, no login.
+	handle /healthz {
+		rewrite * /health
+		reverse_proxy 127.0.0.1:7337
+	}
+
+	# Remote MCP server (streamable HTTP). Repowise checks the bearer token
+	# (REPOWISE_API_KEY) itself; the MCP SDK only accepts a loopback Host.
+	@mcp path /mcp /mcp/* /.well-known/oauth-protected-resource*
+	handle @mcp {
+		reverse_proxy 127.0.0.1:7338 {
+			header_up Host 127.0.0.1:7338
+			flush_interval -1
+		}
+	}
+
+	# Everything else: the web UI and its /api proxy, behind basic auth. After
+	# the login the request carries the API key, so the browser needs no setup.
+	handle {
+		route {
+			basic_auth {
+				{$REPOWISE_USERNAME} {$REPOWISE_PASSWORD_HASH}
+			}
+			request_header Authorization "Bearer {$REPOWISE_API_KEY}"
+			reverse_proxy 127.0.0.1:3000 {
+			flush_interval -1
+			transport http {
+					read_timeout 15m
+				}
+			}
+		}
+	}
+}

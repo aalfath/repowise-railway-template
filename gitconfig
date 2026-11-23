@@ -1,0 +1,14 @@
+# Keep git inside a small Railway service (0.5 GB on the Free plan):
+# index-pack and repack otherwise size threads and caches from the host.
+[pack]
+	threads = 1
+	windowMemory = 64m
+	deltaCacheSize = 32m
+[core]
+	packedGitLimit = 128m
+	packedGitWindowSize = 32m
+	bigFileThreshold = 16m
+[safe]
+	directory = *
+[init]
+	defaultBranch = main
