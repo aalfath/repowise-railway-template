@@ -34,6 +34,7 @@ COPY gitconfig /etc/gitconfig
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY start.sh /usr/local/bin/repowise-start
 COPY bootstrap.py /usr/local/bin/repowise-bootstrap
+COPY sitecustomize.py /usr/local/lib/python3.12/site-packages/sitecustomize.py
 RUN chmod 755 /usr/local/bin/repowise-start
 
 ENV HOME=/data/home \
