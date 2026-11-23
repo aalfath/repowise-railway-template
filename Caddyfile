@@ -38,8 +38,8 @@
 			}
 			request_header Authorization "Bearer {$REPOWISE_API_KEY}"
 			reverse_proxy 127.0.0.1:3000 {
-			flush_interval -1
-			transport http {
+				flush_interval -1
+				transport http {
 					read_timeout 15m
 				}
 			}
