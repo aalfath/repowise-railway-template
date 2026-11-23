@@ -66,7 +66,7 @@ pids="$pids $!"
 REPOWISE_SMALL="$small" python /usr/local/bin/repowise-bootstrap &
 pids="$pids $!"
 
-trap 'kill $pids 2>/dev/null; exit 1' TERM INT
+trap 'kill $pids 2>/dev/null; exit 0' TERM INT  # a stop Railway asked for is not a crash
 # BusyBox/dash have no reliable `wait -n`: poll the children instead.
 while :; do
   for p in $pids; do
